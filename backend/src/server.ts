@@ -33,6 +33,39 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'));
 
+// Root endpoint - API info
+app.get('/', (req, res) => {
+  res.json({
+    name: 'ERP SaaS API',
+    version: '1.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      documentation: {
+        auth: '/api/auth (POST /login, POST /register)',
+        companies: '/api/companies',
+        users: '/api/users',
+        customers: '/api/customers',
+        suppliers: '/api/suppliers',
+        products: '/api/products',
+        categories: '/api/categories',
+        sales: '/api/sales',
+        purchases: '/api/purchases',
+        serviceOrders: '/api/service-orders',
+        accountsPayable: '/api/accounts-payable',
+        accountsReceivable: '/api/accounts-receivable',
+        cashFlow: '/api/cash-flow',
+        inventory: '/api/inventory',
+        dashboard: '/api/dashboard'
+      }
+    },
+    frontend: config.cors.origin,
+    message: 'API está rodando! Acesse o frontend em: ' + config.cors.origin
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
