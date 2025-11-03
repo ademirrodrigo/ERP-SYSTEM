@@ -1,7 +1,9 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 # Instalar dependências necessárias para o Prisma
-RUN apk add --no-cache openssl openssl-dev libc6-compat
+RUN apt-get update -y && \
+    apt-get install -y openssl libssl-dev ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -11,6 +13,7 @@ RUN npm install
 
 COPY . .
 
+# Gerar Prisma Client
 RUN npx prisma generate
 
 EXPOSE 3000

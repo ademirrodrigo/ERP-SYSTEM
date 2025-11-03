@@ -2,24 +2,28 @@
 
 ## Problema Resolvido
 
-✅ Corrigido erro de dependência OpenSSL no container Docker Alpine Linux
+✅ Mudado de Alpine para Debian (node:20-slim) para melhor compatibilidade com Prisma
+✅ Removido warning do docker-compose.yml (version obsoleto)
 
 ## Como Iniciar o Sistema
 
 ### 1. Reconstruir os Containers
 
+**IMPORTANTE**: É necessário reconstruir COMPLETAMENTE os containers após a mudança de imagem base.
+
 ```bash
-# Parar os containers atuais
-docker-compose down
+# Parar e remover containers, imagens e volumes antigos
+docker-compose down -v --rmi all
 
-# Reconstruir a imagem do backend (com as novas dependências)
-docker-compose build backend
-
-# Ou reconstruir tudo
-docker-compose build
+# Reconstruir TUDO do zero (sem cache)
+docker-compose build --no-cache
 
 # Iniciar os containers
 docker-compose up -d
+
+# Aguardar os serviços iniciarem (20-30 segundos)
+# Acompanhe os logs:
+docker-compose logs -f
 ```
 
 ### 2. Executar as Migrations do Banco de Dados
