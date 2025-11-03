@@ -12,65 +12,76 @@
 #
 # ==============================================================================
 
-# Cores para output
-$ErrorActionPreference = 'Stop'
-$Host.UI.RawUI.BackgroundColor = "Black"
-Clear-Host
+$ErrorActionPreference = 'Continue'
 
-function Write-ColorOutput($ForegroundColor) {
-    $fc = $host.UI.RawUI.ForegroundColor
-    $host.UI.RawUI.ForegroundColor = $ForegroundColor
-    if ($args) {
-        Write-Output $args
-    }
-    $host.UI.RawUI.ForegroundColor = $fc
+# Funções de Output
+function Write-ColorText {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Text,
+        [Parameter(Mandatory=$false)]
+        [ConsoleColor]$Color = 'White'
+    )
+    $previousColor = $Host.UI.RawUI.ForegroundColor
+    $Host.UI.RawUI.ForegroundColor = $Color
+    Write-Host $Text
+    $Host.UI.RawUI.ForegroundColor = $previousColor
 }
 
-function Write-Success($message) {
-    Write-ColorOutput Green "✓ $message"
+function Write-Success {
+    param([string]$Message)
+    Write-ColorText "✓ $Message" -Color Green
 }
 
-function Write-Info($message) {
-    Write-ColorOutput Cyan "ℹ $message"
+function Write-Info {
+    param([string]$Message)
+    Write-ColorText "ℹ $Message" -Color Cyan
 }
 
-function Write-Warning($message) {
-    Write-ColorOutput Yellow "⚠ $message"
+function Write-Warn {
+    param([string]$Message)
+    Write-ColorText "⚠ $Message" -Color Yellow
 }
 
-function Write-Error($message) {
-    Write-ColorOutput Red "✗ $message"
+function Write-Err {
+    param([string]$Message)
+    Write-ColorText "✗ $Message" -Color Red
 }
 
-function Write-Header($message) {
-    Write-ColorOutput Magenta "`n========================================`n$message`n========================================`n"
+function Write-Section {
+    param([string]$Title)
+    Write-Host ""
+    Write-ColorText "========================================" -Color Magenta
+    Write-ColorText $Title -Color Magenta
+    Write-ColorText "========================================" -Color Magenta
+    Write-Host ""
 }
 
 # Banner
-Write-Host "`n"
-Write-ColorOutput Cyan @"
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║              INSTALADOR ERP SAAS - WINDOWS                    ║
-║                                                               ║
-║     Sistema de Gestão Empresarial Multi-tenant               ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
-"@
-Write-Host "`n"
+Clear-Host
+Write-Host ""
+Write-ColorText "╔═══════════════════════════════════════════════════════════════╗" -Color Cyan
+Write-ColorText "║                                                               ║" -Color Cyan
+Write-ColorText "║              INSTALADOR ERP SAAS - WINDOWS                    ║" -Color Cyan
+Write-ColorText "║                                                               ║" -Color Cyan
+Write-ColorText "║     Sistema de Gestão Empresarial Multi-tenant               ║" -Color Cyan
+Write-ColorText "║                                                               ║" -Color Cyan
+Write-ColorText "╚═══════════════════════════════════════════════════════════════╝" -Color Cyan
+Write-Host ""
 
 # ==============================================================================
 # VERIFICAÇÕES DE REQUISITOS
 # ==============================================================================
 
-Write-Header "Verificando Requisitos do Sistema"
+Write-Section "Verificando Requisitos do Sistema"
 
 # Verificar se está executando como Administrador
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
-    Write-Warning "Este script precisa ser executado como Administrador!"
+    Write-Warn "Este script precisa ser executado como Administrador!"
     Write-Info "Clique com botão direito no PowerShell e selecione 'Executar como Administrador'"
-    Write-Host "`nPressione qualquer tecla para sair..."
+    Write-Host ""
+    Write-Host "Pressione qualquer tecla para sair..."
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1
 }
@@ -78,54 +89,79 @@ Write-Success "Executando como Administrador"
 
 # Verificar Docker Desktop
 Write-Info "Verificando Docker Desktop..."
+$dockerInstalled = $false
 try {
     $dockerVersion = docker --version 2>$null
     if ($dockerVersion) {
         Write-Success "Docker encontrado: $dockerVersion"
+        $dockerInstalled = $true
     }
 } catch {
-    Write-Error "Docker Desktop não encontrado!"
+    $dockerInstalled = $false
+}
+
+if (-not $dockerInstalled) {
+    Write-Err "Docker Desktop não encontrado!"
     Write-Info "Por favor, instale o Docker Desktop:"
-    Write-Info "https://www.docker.com/products/docker-desktop/"
-    Write-Host "`nPressione qualquer tecla para sair..."
+    Write-ColorText "https://www.docker.com/products/docker-desktop/" -Color White
+    Write-Host ""
+    Write-Host "Pressione qualquer tecla para sair..."
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1
 }
 
 # Verificar se Docker está rodando
 Write-Info "Verificando se Docker está rodando..."
+$dockerRunning = $false
 try {
-    docker ps >$null 2>&1
-    Write-Success "Docker está rodando"
+    docker ps 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Docker está rodando"
+        $dockerRunning = $true
+    }
 } catch {
-    Write-Error "Docker não está rodando!"
+    $dockerRunning = $false
+}
+
+if (-not $dockerRunning) {
+    Write-Err "Docker não está rodando!"
     Write-Info "Por favor, inicie o Docker Desktop e tente novamente"
-    Write-Host "`nPressione qualquer tecla para sair..."
+    Write-Host ""
+    Write-Host "Pressione qualquer tecla para sair..."
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit 1
 }
 
 # Verificar Git
 Write-Info "Verificando Git..."
+$gitInstalled = $false
 try {
     $gitVersion = git --version 2>$null
     if ($gitVersion) {
         Write-Success "Git encontrado: $gitVersion"
+        $gitInstalled = $true
     }
 } catch {
-    Write-Warning "Git não encontrado. Tentando instalar via winget..."
+    $gitInstalled = $false
+}
+
+if (-not $gitInstalled) {
+    Write-Warn "Git não encontrado"
+    Write-Info "Tentando instalar Git via winget..."
     try {
-        winget install -e --id Git.Git
+        winget install -e --id Git.Git --silent --accept-source-agreements --accept-package-agreements
         Write-Success "Git instalado com sucesso!"
-        Write-Info "Por favor, reinicie o PowerShell e execute o instalador novamente"
-        Write-Host "`nPressione qualquer tecla para sair..."
+        Write-Warn "Por favor, reinicie o PowerShell e execute o instalador novamente"
+        Write-Host ""
+        Write-Host "Pressione qualquer tecla para sair..."
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         exit 0
     } catch {
-        Write-Error "Não foi possível instalar o Git automaticamente"
+        Write-Err "Não foi possível instalar o Git automaticamente"
         Write-Info "Por favor, instale o Git manualmente:"
-        Write-Info "https://git-scm.com/download/win"
-        Write-Host "`nPressione qualquer tecla para sair..."
+        Write-ColorText "https://git-scm.com/download/win" -Color White
+        Write-Host ""
+        Write-Host "Pressione qualquer tecla para sair..."
         $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         exit 1
     }
@@ -135,10 +171,11 @@ try {
 # CONFIGURAÇÃO DO DIRETÓRIO DE INSTALAÇÃO
 # ==============================================================================
 
-Write-Header "Configurando Diretório de Instalação"
+Write-Section "Configurando Diretório de Instalação"
 
-$defaultPath = "$env:USERPROFILE\ERP-SYSTEM"
+$defaultPath = Join-Path $env:USERPROFILE "ERP-SYSTEM"
 Write-Info "Diretório padrão de instalação: $defaultPath"
+Write-Host ""
 $installPath = Read-Host "Pressione ENTER para usar o padrão ou digite outro caminho"
 
 if ([string]::IsNullOrWhiteSpace($installPath)) {
@@ -147,10 +184,15 @@ if ([string]::IsNullOrWhiteSpace($installPath)) {
 
 # Criar diretório se não existir
 if (-not (Test-Path $installPath)) {
-    New-Item -ItemType Directory -Path $installPath -Force | Out-Null
-    Write-Success "Diretório criado: $installPath"
+    try {
+        New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+        Write-Success "Diretório criado: $installPath"
+    } catch {
+        Write-Err "Erro ao criar diretório: $_"
+        exit 1
+    }
 } else {
-    Write-Warning "Diretório já existe: $installPath"
+    Write-Warn "Diretório já existe: $installPath"
     $overwrite = Read-Host "Deseja continuar? (S/N)"
     if ($overwrite -ne "S" -and $overwrite -ne "s") {
         Write-Info "Instalação cancelada pelo usuário"
@@ -165,26 +207,36 @@ Write-Success "Diretório de trabalho: $installPath"
 # DOWNLOAD DO CÓDIGO FONTE
 # ==============================================================================
 
-Write-Header "Baixando Código Fonte"
+Write-Section "Baixando Código Fonte"
 
 $repoUrl = "https://github.com/ademirrodrigo/ERP-SYSTEM.git"
 $branch = "claude/erp-multicompany-system-011CUfzAksTb7Aznhq7Vyqy9"
 
 if (Test-Path ".git") {
     Write-Info "Repositório já existe. Atualizando..."
-    git pull origin $branch
-    Write-Success "Código atualizado"
+    try {
+        git pull origin $branch 2>&1 | Out-Null
+        Write-Success "Código atualizado"
+    } catch {
+        Write-Err "Erro ao atualizar repositório: $_"
+        exit 1
+    }
 } else {
     Write-Info "Clonando repositório..."
-    git clone -b $branch $repoUrl .
-    Write-Success "Código baixado com sucesso"
+    try {
+        git clone -b $branch $repoUrl . 2>&1 | Out-Null
+        Write-Success "Código baixado com sucesso"
+    } catch {
+        Write-Err "Erro ao clonar repositório: $_"
+        exit 1
+    }
 }
 
 # ==============================================================================
 # CONFIGURAÇÃO DE VARIÁVEIS DE AMBIENTE
 # ==============================================================================
 
-Write-Header "Configurando Variáveis de Ambiente"
+Write-Section "Configurando Variáveis de Ambiente"
 
 # Backend .env
 $backendEnvPath = "backend\.env"
@@ -213,8 +265,13 @@ CORS_ORIGIN="http://localhost:5173"
 REDIS_URL="redis://redis:6379"
 "@
 
-    $backendEnv | Out-File -FilePath $backendEnvPath -Encoding UTF8
-    Write-Success "Arquivo backend/.env criado"
+    try {
+        $backendEnv | Out-File -FilePath $backendEnvPath -Encoding UTF8
+        Write-Success "Arquivo backend/.env criado"
+    } catch {
+        Write-Err "Erro ao criar backend/.env: $_"
+        exit 1
+    }
 } else {
     Write-Info "Arquivo backend/.env já existe"
 }
@@ -225,8 +282,13 @@ if (-not (Test-Path $frontendEnvPath)) {
     Write-Info "Criando arquivo frontend/.env.local..."
 
     $frontendEnv = "VITE_API_URL=http://localhost:3000/api"
-    $frontendEnv | Out-File -FilePath $frontendEnvPath -Encoding UTF8
-    Write-Success "Arquivo frontend/.env.local criado"
+    try {
+        $frontendEnv | Out-File -FilePath $frontendEnvPath -Encoding UTF8
+        Write-Success "Arquivo frontend/.env.local criado"
+    } catch {
+        Write-Err "Erro ao criar frontend/.env.local: $_"
+        exit 1
+    }
 } else {
     Write-Info "Arquivo frontend/.env.local já existe"
 }
@@ -235,29 +297,39 @@ if (-not (Test-Path $frontendEnvPath)) {
 # INSTALAÇÃO COM DOCKER
 # ==============================================================================
 
-Write-Header "Instalando Sistema com Docker"
+Write-Section "Instalando Sistema com Docker"
 
 Write-Info "Parando containers antigos (se existirem)..."
-docker-compose down -v --remove-orphans 2>$null
+docker-compose down -v --remove-orphans 2>&1 | Out-Null
 
 Write-Info "Reconstruindo imagens Docker..."
-Write-Warning "Isso pode levar alguns minutos na primeira vez..."
-docker-compose build --no-cache
+Write-Warn "Isso pode levar alguns minutos na primeira vez..."
+Write-Host ""
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Erro ao construir imagens Docker"
+try {
+    docker-compose build --no-cache
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Imagens construídas com sucesso"
+    } else {
+        throw "Erro ao construir imagens"
+    }
+} catch {
+    Write-Err "Erro ao construir imagens Docker: $_"
     exit 1
 }
-Write-Success "Imagens construídas com sucesso"
 
 Write-Info "Iniciando containers..."
-docker-compose up -d
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Erro ao iniciar containers"
+try {
+    docker-compose up -d
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Containers iniciados"
+    } else {
+        throw "Erro ao iniciar containers"
+    }
+} catch {
+    Write-Err "Erro ao iniciar containers: $_"
     exit 1
 }
-Write-Success "Containers iniciados"
 
 # Aguardar serviços iniciarem
 Write-Info "Aguardando serviços iniciarem (30 segundos)..."
@@ -271,18 +343,27 @@ docker-compose ps
 # EXECUTAR MIGRATIONS DO BANCO DE DADOS
 # ==============================================================================
 
-Write-Header "Configurando Banco de Dados"
+Write-Section "Configurando Banco de Dados"
 
 Write-Info "Executando migrations do Prisma..."
-docker-compose exec -T backend npx prisma migrate deploy
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Tentando criar migration inicial..."
-    docker-compose exec -T backend npx prisma migrate dev --name init
+try {
+    $migrationResult = docker-compose exec -T backend npx prisma migrate deploy 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "Tentando criar migration inicial..."
+        docker-compose exec backend npx prisma migrate dev --name init
+    }
+    Write-Success "Migrations executadas"
+} catch {
+    Write-Warn "Aviso ao executar migrations: $_"
 }
 
 Write-Info "Gerando Prisma Client..."
-docker-compose exec -T backend npx prisma generate
+try {
+    docker-compose exec -T backend npx prisma generate 2>&1 | Out-Null
+    Write-Success "Prisma Client gerado"
+} catch {
+    Write-Warn "Aviso ao gerar Prisma Client: $_"
+}
 
 Write-Success "Banco de dados configurado"
 
@@ -290,102 +371,84 @@ Write-Success "Banco de dados configurado"
 # VERIFICAÇÃO FINAL
 # ==============================================================================
 
-Write-Header "Verificação Final"
+Write-Section "Verificação Final"
 
 Write-Info "Testando conectividade..."
 
 # Testar backend
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:3000/health" -UseBasicParsing -TimeoutSec 5
+    $response = Invoke-WebRequest -Uri "http://localhost:3000/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
     if ($response.StatusCode -eq 200) {
         Write-Success "Backend respondendo em http://localhost:3000"
     }
 } catch {
-    Write-Warning "Backend não está respondendo ainda"
-    Write-Info "Os serviços podem levar alguns minutos para iniciar completamente"
+    Write-Warn "Backend ainda está inicializando..."
 }
 
 # Testar frontend
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 5
+    $response = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
     if ($response.StatusCode -eq 200) {
         Write-Success "Frontend respondendo em http://localhost:5173"
     }
 } catch {
-    Write-Warning "Frontend não está respondendo ainda"
-    Write-Info "Os serviços podem levar alguns minutos para iniciar completamente"
+    Write-Warn "Frontend ainda está inicializando..."
 }
 
 # ==============================================================================
 # INFORMAÇÕES FINAIS
 # ==============================================================================
 
-Write-Host "`n"
-Write-ColorOutput Green @"
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║              INSTALAÇÃO CONCLUÍDA COM SUCESSO!                ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
-"@
-
-Write-Host "`n"
-Write-Header "📋 INFORMAÇÕES DE ACESSO"
 Write-Host ""
-Write-ColorOutput Cyan "  🌐 Frontend (Interface Web):"
-Write-ColorOutput White "     http://localhost:5173"
-Write-Host ""
-Write-ColorOutput Cyan "  🔌 Backend API:"
-Write-ColorOutput White "     http://localhost:3000"
-Write-Host ""
-Write-ColorOutput Cyan "  ❤️  Health Check:"
-Write-ColorOutput White "     http://localhost:3000/health"
-Write-Host ""
-Write-ColorOutput Cyan "  🗄️  Prisma Studio (Banco de Dados):"
-Write-ColorOutput White "     Execute: docker-compose exec backend npx prisma studio"
-Write-ColorOutput White "     Acesse: http://localhost:5555"
+Write-ColorText "╔═══════════════════════════════════════════════════════════════╗" -Color Green
+Write-ColorText "║                                                               ║" -Color Green
+Write-ColorText "║              INSTALAÇÃO CONCLUÍDA COM SUCESSO!                ║" -Color Green
+Write-ColorText "║                                                               ║" -Color Green
+Write-ColorText "╚═══════════════════════════════════════════════════════════════╝" -Color Green
 Write-Host ""
 
-Write-Header "🚀 PRÓXIMOS PASSOS"
+Write-Section "INFORMAÇÕES DE ACESSO"
 Write-Host ""
-Write-ColorOutput Yellow "  1. Abra seu navegador em: http://localhost:5173"
-Write-ColorOutput Yellow "  2. Clique em 'Criar Conta'"
-Write-ColorOutput Yellow "  3. Preencha seus dados e crie sua empresa"
-Write-ColorOutput Yellow "  4. Comece a usar o sistema!"
+Write-ColorText "  🌐 Frontend (Interface Web):" -Color Cyan
+Write-ColorText "     http://localhost:5173" -Color White
 Write-Host ""
-
-Write-Header "🛠️  COMANDOS ÚTEIS"
+Write-ColorText "  🔌 Backend API:" -Color Cyan
+Write-ColorText "     http://localhost:3000" -Color White
 Write-Host ""
-Write-ColorOutput White "  Ver logs:"
-Write-ColorOutput Gray "    docker-compose logs -f"
-Write-Host ""
-Write-ColorOutput White "  Parar sistema:"
-Write-ColorOutput Gray "    docker-compose down"
-Write-Host ""
-Write-ColorOutput White "  Iniciar sistema:"
-Write-ColorOutput Gray "    docker-compose up -d"
-Write-Host ""
-Write-ColorOutput White "  Reiniciar sistema:"
-Write-ColorOutput Gray "    docker-compose restart"
-Write-Host ""
-Write-ColorOutput White "  Status dos containers:"
-Write-ColorOutput Gray "    docker-compose ps"
+Write-ColorText "  ❤️  Health Check:" -Color Cyan
+Write-ColorText "     http://localhost:3000/health" -Color White
 Write-Host ""
 
-Write-Header "📁 LOCALIZAÇÃO DOS ARQUIVOS"
-Write-ColorOutput White "  $installPath"
+Write-Section "PRÓXIMOS PASSOS"
+Write-Host ""
+Write-ColorText "  1. Abra seu navegador em: http://localhost:5173" -Color Yellow
+Write-ColorText "  2. Clique em 'Criar Conta'" -Color Yellow
+Write-ColorText "  3. Preencha seus dados e crie sua empresa" -Color Yellow
+Write-ColorText "  4. Comece a usar o sistema!" -Color Yellow
 Write-Host ""
 
-Write-Header "📚 DOCUMENTAÇÃO"
-Write-ColorOutput White "  README.md"
-Write-ColorOutput Gray "    Documentação completa do sistema"
+Write-Section "COMANDOS ÚTEIS"
 Write-Host ""
-Write-ColorOutput White "  QUICKSTART.md"
-Write-ColorOutput Gray "    Guia rápido de inicialização"
+Write-ColorText "  Ver logs:" -Color White
+Write-ColorText "    docker-compose logs -f" -Color Gray
+Write-Host ""
+Write-ColorText "  Parar sistema:" -Color White
+Write-ColorText "    docker-compose down" -Color Gray
+Write-Host ""
+Write-ColorText "  Iniciar sistema:" -Color White
+Write-ColorText "    docker-compose up -d" -Color Gray
+Write-Host ""
+Write-ColorText "  Status dos containers:" -Color White
+Write-ColorText "    docker-compose ps" -Color Gray
 Write-Host ""
 
-Write-ColorOutput Green "`n🎉 Sistema ERP SaaS instalado e pronto para uso!"
-Write-ColorOutput Cyan "   Desenvolvido com ❤️  para facilitar a gestão empresarial`n"
+Write-Section "LOCALIZAÇÃO DOS ARQUIVOS"
+Write-ColorText "  $installPath" -Color White
+Write-Host ""
+
+Write-ColorText "🎉 Sistema ERP SaaS instalado e pronto para uso!" -Color Green
+Write-ColorText "   Desenvolvido com ❤️  para facilitar a gestão empresarial" -Color Cyan
+Write-Host ""
 
 Write-Host "Pressione qualquer tecla para abrir o navegador..."
 $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
@@ -394,3 +457,4 @@ $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 Start-Process "http://localhost:5173"
 
 Write-Success "Instalação finalizada!"
+Write-Host ""

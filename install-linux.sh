@@ -186,8 +186,8 @@ docker compose version
 print_header "Configurando Firewall"
 
 # Perguntar se deseja configurar firewall
-echo -e "${YELLOW}Deseja configurar o firewall? (S/n)${NC}"
-read -r CONFIGURE_FIREWALL
+echo -e "${YELLOW}Deseja configurar o firewall? (S/n) [10s timeout]${NC}"
+read -t 10 -r CONFIGURE_FIREWALL || CONFIGURE_FIREWALL="S"
 
 if [[ "$CONFIGURE_FIREWALL" != "n" && "$CONFIGURE_FIREWALL" != "N" ]]; then
     if command -v ufw &> /dev/null; then
@@ -223,8 +223,8 @@ print_header "Configurando Diretório de Instalação"
 
 DEFAULT_PATH="/opt/erp-system"
 echo -e "${CYAN}Diretório padrão de instalação: $DEFAULT_PATH${NC}"
-echo -e "${YELLOW}Pressione ENTER para usar o padrão ou digite outro caminho:${NC}"
-read -r INSTALL_PATH
+echo -e "${YELLOW}Pressione ENTER para usar o padrão ou digite outro caminho: [10s timeout]${NC}"
+read -t 10 -r INSTALL_PATH || INSTALL_PATH=""
 
 if [[ -z "$INSTALL_PATH" ]]; then
     INSTALL_PATH=$DEFAULT_PATH
@@ -236,8 +236,8 @@ if [ ! -d "$INSTALL_PATH" ]; then
     print_success "Diretório criado: $INSTALL_PATH"
 else
     print_warning "Diretório já existe: $INSTALL_PATH"
-    echo -e "${YELLOW}Deseja continuar? (S/n)${NC}"
-    read -r CONTINUE
+    echo -e "${YELLOW}Deseja continuar? (S/n) [10s timeout]${NC}"
+    read -t 10 -r CONTINUE || CONTINUE="S"
     if [[ "$CONTINUE" == "n" || "$CONTINUE" == "N" ]]; then
         print_info "Instalação cancelada pelo usuário"
         exit 0
@@ -258,13 +258,40 @@ BRANCH="claude/erp-multicompany-system-011CUfzAksTb7Aznhq7Vyqy9"
 
 if [ -d ".git" ]; then
     print_info "Repositório já existe. Atualizando..."
-    git pull origin "$BRANCH"
-    print_success "Código atualizado"
+    if git pull origin "$BRANCH"; then
+        print_success "Código atualizado"
+    else
+        print_error "Erro ao atualizar repositório"
+        exit 1
+    fi
 else
     print_info "Clonando repositório..."
-    git clone -b "$BRANCH" "$REPO_URL" .
-    print_success "Código baixado com sucesso"
+    if git clone -b "$BRANCH" "$REPO_URL" .; then
+        print_success "Código baixado com sucesso"
+    else
+        print_error "Erro ao clonar repositório. Verifique sua conexão e tente novamente."
+        exit 1
+    fi
 fi
+
+# Verificar se arquivos essenciais existem
+print_info "Verificando arquivos do projeto..."
+if [ ! -f "docker-compose.yml" ]; then
+    print_error "Arquivo docker-compose.yml não encontrado!"
+    exit 1
+fi
+
+if [ ! -d "backend" ]; then
+    print_error "Diretório backend não encontrado!"
+    exit 1
+fi
+
+if [ ! -d "frontend" ]; then
+    print_error "Diretório frontend não encontrado!"
+    exit 1
+fi
+
+print_success "Estrutura do projeto verificada"
 
 # ==============================================================================
 # CONFIGURAÇÃO DE VARIÁVEIS DE AMBIENTE
@@ -277,8 +304,8 @@ PUBLIC_IP=$(curl -s ifconfig.me || echo "localhost")
 print_info "IP público detectado: $PUBLIC_IP"
 
 # Perguntar domínio
-echo -e "${YELLOW}Digite seu domínio (ou pressione ENTER para usar o IP):${NC}"
-read -r DOMAIN
+echo -e "${YELLOW}Digite seu domínio (ou pressione ENTER para usar o IP): [15s timeout]${NC}"
+read -t 15 -r DOMAIN || DOMAIN=""
 
 if [[ -z "$DOMAIN" ]]; then
     DOMAIN=$PUBLIC_IP
@@ -291,11 +318,19 @@ BACKEND_ENV_PATH="backend/.env"
 if [ ! -f "$BACKEND_ENV_PATH" ]; then
     print_info "Criando arquivo backend/.env..."
 
-    # Gerar JWT Secret aleatório
-    JWT_SECRET=$(openssl rand -base64 32)
+    # Verificar se openssl está disponível
+    if command -v openssl &> /dev/null; then
+        # Gerar JWT Secret aleatório
+        JWT_SECRET=$(openssl rand -base64 32)
 
-    # Gerar senha segura para PostgreSQL
-    DB_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-20)
+        # Gerar senha segura para PostgreSQL
+        DB_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-20)
+    else
+        print_warning "OpenSSL não encontrado. Usando fallback para geração de senhas."
+        # Fallback usando /dev/urandom
+        JWT_SECRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        DB_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1)
+    fi
 
     cat > "$BACKEND_ENV_PATH" << EOF
 # Database
@@ -320,7 +355,15 @@ EOF
     print_success "Arquivo backend/.env criado"
 
     # Atualizar docker-compose.yml com a nova senha do PostgreSQL
+    print_info "Atualizando senhas no docker-compose.yml..."
+
+    # Atualizar senha do serviço postgres
     sed -i "s/POSTGRES_PASSWORD: postgres/POSTGRES_PASSWORD: ${DB_PASSWORD}/" docker-compose.yml
+
+    # Atualizar DATABASE_URL no serviço backend (substitui a senha postgres:postgres por postgres:${DB_PASSWORD})
+    sed -i "s|postgresql://postgres:postgres@postgres|postgresql://postgres:${DB_PASSWORD}@postgres|g" docker-compose.yml
+
+    print_success "Senhas atualizadas no docker-compose.yml"
 
 else
     print_info "Arquivo backend/.env já existe"
@@ -351,14 +394,22 @@ docker compose down -v --remove-orphans 2>/dev/null || true
 
 print_info "Reconstruindo imagens Docker..."
 print_warning "Isso pode levar alguns minutos na primeira vez..."
-docker compose build --no-cache
-
-print_success "Imagens construídas com sucesso"
+if docker compose build --no-cache; then
+    print_success "Imagens construídas com sucesso"
+else
+    print_error "Erro ao construir imagens Docker"
+    print_info "Verifique os logs acima para mais detalhes"
+    exit 1
+fi
 
 print_info "Iniciando containers..."
-docker compose up -d
-
-print_success "Containers iniciados"
+if docker compose up -d; then
+    print_success "Containers iniciados"
+else
+    print_error "Erro ao iniciar containers"
+    print_info "Execute 'docker compose logs' para ver os erros"
+    exit 1
+fi
 
 # Aguardar serviços iniciarem
 print_info "Aguardando serviços iniciarem (30 segundos)..."
@@ -368,18 +419,58 @@ sleep 30
 print_info "Status dos containers:"
 docker compose ps
 
+# Verificar se os containers principais estão rodando
+print_info "Verificando saúde dos containers..."
+BACKEND_STATUS=$(docker compose ps backend --format json 2>/dev/null | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+FRONTEND_STATUS=$(docker compose ps frontend --format json 2>/dev/null | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+POSTGRES_STATUS=$(docker compose ps postgres --format json 2>/dev/null | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
+
+if [[ "$POSTGRES_STATUS" == "running" ]]; then
+    print_success "PostgreSQL está rodando"
+else
+    print_error "PostgreSQL não está rodando! Status: $POSTGRES_STATUS"
+fi
+
+if [[ "$BACKEND_STATUS" == "running" ]]; then
+    print_success "Backend está rodando"
+else
+    print_warning "Backend não está rodando. Status: $BACKEND_STATUS"
+    print_info "Verifique os logs: docker compose logs backend"
+fi
+
+if [[ "$FRONTEND_STATUS" == "running" ]]; then
+    print_success "Frontend está rodando"
+else
+    print_warning "Frontend não está rodando. Status: $FRONTEND_STATUS"
+    print_info "Verifique os logs: docker compose logs frontend"
+fi
+
 # ==============================================================================
 # EXECUTAR MIGRATIONS DO BANCO DE DADOS
 # ==============================================================================
 
 print_header "Configurando Banco de Dados"
 
+print_info "Aguardando backend inicializar (mais 10 segundos)..."
+sleep 10
+
 print_info "Executando migrations do Prisma..."
-docker compose exec -T backend npx prisma migrate deploy 2>/dev/null || \
-docker compose exec -T backend npx prisma migrate dev --name init
+if docker compose exec -T backend npx prisma migrate deploy 2>/dev/null; then
+    print_success "Migrations executadas com sucesso"
+elif docker compose exec backend npx prisma migrate dev --name init --skip-generate; then
+    print_success "Migration inicial criada"
+else
+    print_warning "Não foi possível executar migrations automaticamente"
+    print_info "Execute manualmente: docker compose exec backend npx prisma migrate dev --name init"
+fi
 
 print_info "Gerando Prisma Client..."
-docker compose exec -T backend npx prisma generate
+if docker compose exec -T backend npx prisma generate 2>/dev/null; then
+    print_success "Prisma Client gerado"
+else
+    print_warning "Erro ao gerar Prisma Client"
+    print_info "Execute manualmente: docker compose exec backend npx prisma generate"
+fi
 
 print_success "Banco de dados configurado"
 
@@ -389,8 +480,8 @@ print_success "Banco de dados configurado"
 
 print_header "Configuração de Nginx Reverse Proxy (Opcional)"
 
-echo -e "${YELLOW}Deseja configurar Nginx como reverse proxy? (s/N)${NC}"
-read -r CONFIGURE_NGINX
+echo -e "${YELLOW}Deseja configurar Nginx como reverse proxy? (s/N) [10s timeout]${NC}"
+read -t 10 -r CONFIGURE_NGINX || CONFIGURE_NGINX="N"
 
 if [[ "$CONFIGURE_NGINX" == "s" || "$CONFIGURE_NGINX" == "S" ]]; then
     print_info "Instalando Nginx..."
@@ -461,8 +552,8 @@ fi
 
 print_header "Configuração de Serviço Systemd (Opcional)"
 
-echo -e "${YELLOW}Deseja criar um serviço systemd para iniciar automaticamente? (S/n)${NC}"
-read -r CREATE_SERVICE
+echo -e "${YELLOW}Deseja criar um serviço systemd para iniciar automaticamente? (S/n) [10s timeout]${NC}"
+read -t 10 -r CREATE_SERVICE || CREATE_SERVICE="S"
 
 if [[ "$CREATE_SERVICE" != "n" && "$CREATE_SERVICE" != "N" ]]; then
     print_info "Criando serviço systemd..."
