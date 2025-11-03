@@ -95,10 +95,75 @@ if %errorLevel% neq 0 (
 echo.
 
 REM ==============================================================================
+REM VERIFICAR PORTAS DISPONIVEIS
+REM ==============================================================================
+
+echo [4/10] Verificando portas disponiveis...
+echo.
+
+set PORTS_OK=1
+
+REM Verificar porta 3000 (Backend)
+netstat -ano | findstr :3000 | findstr LISTENING >nul 2>&1
+if %errorLevel% equ 0 (
+    echo [AVISO] Porta 3000 esta em uso!
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000 ^| findstr LISTENING') do (
+        echo Processo usando porta 3000: PID %%a
+        tasklist /FI "PID eq %%a" /FO LIST | findstr "Image"
+    )
+    set PORTS_OK=0
+)
+
+REM Verificar porta 5173 (Frontend)
+netstat -ano | findstr :5173 | findstr LISTENING >nul 2>&1
+if %errorLevel% equ 0 (
+    echo [AVISO] Porta 5173 esta em uso!
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') do (
+        echo Processo usando porta 5173: PID %%a
+        tasklist /FI "PID eq %%a" /FO LIST | findstr "Image"
+    )
+    set PORTS_OK=0
+)
+
+REM Verificar porta 5432 (PostgreSQL)
+netstat -ano | findstr :5432 | findstr LISTENING >nul 2>&1
+if %errorLevel% equ 0 (
+    echo [AVISO] Porta 5432 esta em uso!
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr :5432 ^| findstr LISTENING') do (
+        echo Processo usando porta 5432: PID %%a
+        tasklist /FI "PID eq %%a" /FO LIST | findstr "Image"
+    )
+    set PORTS_OK=0
+)
+
+if !PORTS_OK! equ 0 (
+    echo.
+    echo [ERRO] Algumas portas necessarias estao em uso!
+    echo.
+    echo Para resolver:
+    echo   1. Execute: fix-ports.bat (como Administrador)
+    echo   2. Ou feche manualmente os programas que estao usando essas portas
+    echo   3. Ou reinicie o computador
+    echo.
+    echo Deseja continuar mesmo assim? (s/N)
+    set /p CONTINUE_ANYWAY=""
+    if /i "!CONTINUE_ANYWAY!" neq "s" (
+        echo.
+        echo Instalacao cancelada.
+        echo Execute fix-ports.bat para resolver os conflitos de porta.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [OK] Todas as portas necessarias estao disponiveis
+)
+echo.
+
+REM ==============================================================================
 REM DIRETORIO DE INSTALACAO
 REM ==============================================================================
 
-echo [4/10] Configurando diretorio de instalacao...
+echo [5/10] Configurando diretorio de instalacao...
 set DEFAULT_PATH=%USERPROFILE%\ERP-System
 echo.
 echo Diretorio padrao: %DEFAULT_PATH%
@@ -134,7 +199,7 @@ REM ============================================================================
 REM DOWNLOAD DO CODIGO FONTE
 REM ==============================================================================
 
-echo [5/10] Baixando codigo fonte...
+echo [6/10] Baixando codigo fonte...
 
 set REPO_URL=https://github.com/ademirrodrigo/whatsaasinstall.git
 set BRANCH=claude/erp-multicompany-system-011CUfzAksTb7Aznhq7Vyqy9
@@ -186,7 +251,7 @@ REM ============================================================================
 REM CONFIGURACAO DE VARIAVEIS DE AMBIENTE
 REM ==============================================================================
 
-echo [6/10] Configurando variaveis de ambiente...
+echo [7/10] Configurando variaveis de ambiente...
 echo.
 
 REM Gerar JWT Secret
@@ -234,7 +299,7 @@ REM ============================================================================
 REM PARAR CONTAINERS ANTIGOS
 REM ==============================================================================
 
-echo [7/10] Parando containers antigos (se existirem)...
+echo [8/10] Parando containers antigos (se existirem)...
 docker compose down -v --remove-orphans >nul 2>&1
 echo [OK] Containers antigos removidos
 echo.
@@ -243,7 +308,7 @@ REM ============================================================================
 REM CONSTRUIR IMAGENS DOCKER
 REM ==============================================================================
 
-echo [8/10] Construindo imagens Docker...
+echo [9/10] Construindo imagens Docker...
 echo.
 echo Isso pode levar varios minutos na primeira vez...
 echo Por favor, aguarde...
@@ -266,7 +331,7 @@ REM ============================================================================
 REM INICIAR CONTAINERS
 REM ==============================================================================
 
-echo [9/10] Iniciando containers...
+echo Iniciando containers...
 docker compose up -d
 if %errorLevel% neq 0 (
     echo [ERRO] Falha ao iniciar containers!
