@@ -3,9 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard,
   Package,
+  FolderOpen,
   Users,
   ShoppingCart,
   Wrench,
+  DollarSign,
+  CreditCard,
   LogOut,
   Menu,
 } from 'lucide-react';
@@ -19,9 +22,12 @@ const Layout = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Produtos', href: '/products', icon: Package },
+    { name: 'Categorias', href: '/categories', icon: FolderOpen },
     { name: 'Clientes', href: '/customers', icon: Users },
     { name: 'Vendas', href: '/sales', icon: ShoppingCart },
     { name: 'Serviços', href: '/services', icon: Wrench },
+    { name: 'Contas a Receber', href: '/accounts-receivable', icon: DollarSign },
+    { name: 'Contas a Pagar', href: '/accounts-payable', icon: CreditCard },
   ];
 
   const isActive = (path: string) => {

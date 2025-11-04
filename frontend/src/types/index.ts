@@ -107,6 +107,33 @@ export interface ServiceOrderItem {
   product?: Product;
 }
 
+export interface AccountReceivable {
+  id: string;
+  description: string;
+  amount: number;
+  dueDate: string;
+  paymentDate?: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  category?: string;
+  notes?: string;
+  customer?: Customer;
+}
+
+export interface AccountPayable {
+  id: string;
+  description: string;
+  amount: number;
+  dueDate: string;
+  paymentDate?: string;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  category?: string;
+  notes?: string;
+  supplier?: {
+    id: string;
+    name: string;
+  };
+}
+
 export interface DashboardStats {
   monthSales: {
     total: number;
