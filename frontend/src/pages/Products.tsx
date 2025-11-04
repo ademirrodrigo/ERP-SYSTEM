@@ -170,7 +170,10 @@ const Products = () => {
                       </td>
                       <td>
                         <div className="flex items-center space-x-2">
-                          <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <button
+                            onClick={() => toast.info('Funcionalidade de edição em desenvolvimento')}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
