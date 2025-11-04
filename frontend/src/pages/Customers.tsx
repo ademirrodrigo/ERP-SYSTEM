@@ -3,11 +3,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { Customer, PaginatedResponse } from '../types';
 import { toast } from 'sonner';
-import { Plus, Search, Edit, Trash2, Users } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Users, X } from 'lucide-react';
 
 const Customers = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    cpf: '',
+    cnpj: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    isActive: true,
+  });
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -17,6 +30,30 @@ const Customers = () => {
         params: { page, limit: 10, search },
       });
       return response.data;
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/customers', data),
+    onSuccess: () => {
+      toast.success('Cliente criado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setIsModalOpen(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        cpf: '',
+        cnpj: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        isActive: true,
+      });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao criar cliente');
     },
   });
 
@@ -31,6 +68,15 @@ const Customers = () => {
     },
   });
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      toast.error('Nome é obrigatório');
+      return;
+    }
+    createMutation.mutate(formData);
+  };
+
   const handleDelete = (id: string) => {
     if (window.confirm('Tem certeza que deseja deletar este cliente?')) {
       deleteMutation.mutate(id);
@@ -41,7 +87,10 @@ const Customers = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
-        <button className="btn-primary flex items-center">
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="btn-primary flex items-center"
+        >
           <Plus className="w-5 h-5 mr-2" />
           Novo Cliente
         </button>
@@ -152,6 +201,208 @@ const Customers = () => {
           </>
         )}
       </div>
+
+      {/* Create Customer Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Novo Cliente</h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6">
+              <div className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nome <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="input"
+                    required
+                  />
+                </div>
+
+                {/* Email e Telefone */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Telefone
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      className="input"
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+
+                {/* CPF e CNPJ */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CPF
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cpf}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cpf: e.target.value })
+                      }
+                      className="input"
+                      placeholder="000.000.000-00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CNPJ
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.cnpj}
+                      onChange={(e) =>
+                        setFormData({ ...formData, cnpj: e.target.value })
+                      }
+                      className="input"
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </div>
+                </div>
+
+                {/* Endereço */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Endereço
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) =>
+                      setFormData({ ...formData, address: e.target.value })
+                    }
+                    className="input"
+                  />
+                </div>
+
+                {/* Cidade, Estado e CEP */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cidade
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) =>
+                        setFormData({ ...formData, city: e.target.value })
+                      }
+                      className="input"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Estado
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.state}
+                      onChange={(e) =>
+                        setFormData({ ...formData, state: e.target.value })
+                      }
+                      className="input"
+                      placeholder="SP"
+                      maxLength={2}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      CEP
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.zipCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, zipCode: e.target.value })
+                      }
+                      className="input"
+                      placeholder="00000-000"
+                    />
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={formData.isActive}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isActive: e.target.checked })
+                    }
+                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+                  />
+                  <label
+                    htmlFor="isActive"
+                    className="ml-2 text-sm font-medium text-gray-700"
+                  >
+                    Cliente Ativo
+                  </label>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  className="btn-primary"
+                >
+                  {createMutation.isPending ? 'Salvando...' : 'Salvar Cliente'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
