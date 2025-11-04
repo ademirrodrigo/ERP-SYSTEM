@@ -78,7 +78,7 @@ const NewSale = () => {
       return;
     }
 
-    const price = selectedProduct.price;
+    const price = Number(selectedProduct.price);
     const subtotal = quantity * price - itemDiscount;
 
     const newItem: SaleItem = {
@@ -167,12 +167,12 @@ const NewSale = () => {
                       <div className="flex-1">
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-gray-600">
-                          {item.quantity} x R$ {item.price.toFixed(2)}
+                          {item.quantity} x R$ {Number(item.price).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center space-x-4">
                         <p className="font-medium">
-                          R$ {item.subtotal.toFixed(2)}
+                          R$ {Number(item.subtotal).toFixed(2)}
                         </p>
                         <button
                           type="button"
@@ -216,7 +216,7 @@ const NewSale = () => {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+                  <span className="font-medium">R$ {Number(subtotal).toFixed(2)}</span>
                 </div>
 
                 <div>
@@ -235,7 +235,7 @@ const NewSale = () => {
 
                 <div className="flex justify-between text-lg font-bold border-t pt-3">
                   <span>Total:</span>
-                  <span className="text-primary-600">R$ {total.toFixed(2)}</span>
+                  <span className="text-primary-600">R$ {Number(total).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -310,7 +310,7 @@ const NewSale = () => {
                     .filter((p) => p.isActive && p.stock > 0)
                     .map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.name} - R$ {product.price.toFixed(2)} (Estoque:{' '}
+                        {product.name} - R$ {Number(product.price).toFixed(2)} (Estoque:{' '}
                         {product.stock})
                       </option>
                     ))}
@@ -360,7 +360,7 @@ const NewSale = () => {
                   </p>
                   <p className="text-2xl font-bold text-primary-600">
                     R${' '}
-                    {(quantity * selectedProduct.price - itemDiscount).toFixed(2)}
+                    {(quantity * Number(selectedProduct.price) - itemDiscount).toFixed(2)}
                   </p>
                 </div>
               )}

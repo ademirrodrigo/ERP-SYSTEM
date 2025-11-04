@@ -81,7 +81,7 @@ const Sales = () => {
                       <td>{sale.customer?.name || 'Cliente Avulso'}</td>
                       <td>{sale.user?.name || '-'}</td>
                       <td>{getPaymentMethodLabel(sale.paymentMethod)}</td>
-                      <td className="font-medium">R$ {sale.total.toFixed(2)}</td>
+                      <td className="font-medium">R$ {Number(sale.total).toFixed(2)}</td>
                       <td>
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${

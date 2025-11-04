@@ -32,28 +32,28 @@ const Dashboard = () => {
   const cards = [
     {
       title: 'Vendas do Mês',
-      value: `R$ ${stats.monthSales?.total.toFixed(2) || '0.00'}`,
+      value: `R$ ${stats.monthSales?.total ? Number(stats.monthSales.total).toFixed(2) : '0.00'}`,
       subtitle: `${stats.monthSales?.count || 0} vendas`,
       icon: DollarSign,
       color: 'bg-green-500',
     },
     {
       title: 'Vendas Hoje',
-      value: `R$ ${stats.todaySales?.total.toFixed(2) || '0.00'}`,
+      value: `R$ ${stats.todaySales?.total ? Number(stats.todaySales.total).toFixed(2) : '0.00'}`,
       subtitle: `${stats.todaySales?.count || 0} vendas`,
       icon: ShoppingCart,
       color: 'bg-blue-500',
     },
     {
       title: 'Contas a Receber Vencidas',
-      value: `R$ ${stats.overdueReceivables?.total.toFixed(2) || '0.00'}`,
+      value: `R$ ${stats.overdueReceivables?.total ? Number(stats.overdueReceivables.total).toFixed(2) : '0.00'}`,
       subtitle: `${stats.overdueReceivables?.count || 0} contas`,
       icon: AlertCircle,
       color: 'bg-red-500',
     },
     {
       title: 'Contas a Pagar Pendentes',
-      value: `R$ ${stats.pendingPayables?.total.toFixed(2) || '0.00'}`,
+      value: `R$ ${stats.pendingPayables?.total ? Number(stats.pendingPayables.total).toFixed(2) : '0.00'}`,
       subtitle: `${stats.pendingPayables?.count || 0} contas`,
       icon: TrendingUp,
       color: 'bg-orange-500',
@@ -124,7 +124,7 @@ const Dashboard = () => {
                     <td className="font-medium">#{sale.saleNumber}</td>
                     <td>{sale.customer?.name || 'Cliente Avulso'}</td>
                     <td>{sale.user?.name}</td>
-                    <td>R$ {sale.total.toFixed(2)}</td>
+                    <td>R$ {Number(sale.total).toFixed(2)}</td>
                     <td>
                       <span
                         className={`px-2 py-1 text-xs font-medium rounded-full ${

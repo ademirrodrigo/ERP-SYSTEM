@@ -144,7 +144,7 @@ const Products = () => {
                     <tr key={product.id}>
                       <td className="font-medium">{product.name}</td>
                       <td>{product.sku || '-'}</td>
-                      <td>R$ {product.price.toFixed(2)}</td>
+                      <td>R$ {Number(product.price).toFixed(2)}</td>
                       <td>
                         <span
                           className={`${
