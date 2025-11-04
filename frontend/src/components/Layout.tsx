@@ -5,6 +5,7 @@ import {
   Package,
   Users,
   ShoppingCart,
+  Wrench,
   LogOut,
   Menu,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ const Layout = () => {
     { name: 'Produtos', href: '/products', icon: Package },
     { name: 'Clientes', href: '/customers', icon: Users },
     { name: 'Vendas', href: '/sales', icon: ShoppingCart },
+    { name: 'Serviços', href: '/services', icon: Wrench },
   ];
 
   const isActive = (path: string) => {

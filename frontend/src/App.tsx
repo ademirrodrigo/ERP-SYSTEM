@@ -8,6 +8,7 @@ import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Sales from './pages/Sales';
 import NewSale from './pages/NewSale';
+import ServiceOrders from './pages/ServiceOrders';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, loading } = useAuth();
@@ -45,6 +46,7 @@ function App() {
         <Route path="customers" element={<Customers />} />
         <Route path="sales" element={<Sales />} />
         <Route path="sales/new" element={<NewSale />} />
+        <Route path="services" element={<ServiceOrders />} />
       </Route>
     </Routes>
   );

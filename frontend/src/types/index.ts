@@ -81,6 +81,32 @@ export interface SaleItem {
   product: Product;
 }
 
+export interface ServiceOrder {
+  id: string;
+  orderNumber: string;
+  date: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'DELIVERED' | 'CANCELLED';
+  description: string;
+  diagnosis?: string;
+  solution?: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  customer?: Customer;
+  technician?: User;
+  items: ServiceOrderItem[];
+}
+
+export interface ServiceOrderItem {
+  id: string;
+  type: 'SERVICE' | 'PRODUCT';
+  description: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  product?: Product;
+}
+
 export interface DashboardStats {
   monthSales: {
     total: number;
