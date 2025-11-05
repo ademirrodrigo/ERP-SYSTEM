@@ -19,6 +19,7 @@ import purchaseRoutes from './routes/purchase.routes';
 import serviceOrderRoutes from './routes/serviceOrder.routes';
 import accountPayableRoutes from './routes/accountPayable.routes';
 import accountReceivableRoutes from './routes/accountReceivable.routes';
+import nfseRoutes from './routes/nfse.routes';
 import cashFlowRoutes from './routes/cashFlow.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import dashboardRoutes from './routes/dashboard.routes';
@@ -56,6 +57,7 @@ app.get('/', (req, res) => {
         serviceOrders: '/api/service-orders',
         accountsPayable: '/api/accounts-payable',
         accountsReceivable: '/api/accounts-receivable',
+        nfse: '/api/nfse',
         cashFlow: '/api/cash-flow',
         inventory: '/api/inventory',
         dashboard: '/api/dashboard'
@@ -84,6 +86,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/service-orders', serviceOrderRoutes);
 app.use('/api/accounts-payable', accountPayableRoutes);
 app.use('/api/accounts-receivable', accountReceivableRoutes);
+app.use('/api/nfse', nfseRoutes);
 app.use('/api/cash-flow', cashFlowRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/dashboard', dashboardRoutes);

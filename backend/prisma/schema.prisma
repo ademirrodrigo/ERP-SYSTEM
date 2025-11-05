@@ -43,6 +43,14 @@ model Company {
   accountsReceivable AccountReceivable[]
   cashFlows       CashFlow[]
   inventoryMovements InventoryMovement[]
+  nfse            Nfse[]
+
+  // Dados fiscais para emissão de NFS-e
+  inscricaoMunicipal String?
+  codigoMunicipio    String? // Código IBGE do município
+  regimeTributacao   Int? // 1-Simples Nacional, 2-Fixo, 3-Estimativa, 4-S.Normal
+  optanteSimplesNacional Boolean @default(false)
+  incentivadorCultural Boolean @default(false)
 
   @@index([cnpj])
   @@map("companies")
@@ -114,6 +122,7 @@ model Customer {
   sales     Sale[]
   serviceOrders ServiceOrder[]
   accountsReceivable AccountReceivable[]
+  nfse      Nfse[]
 
   @@index([companyId])
   @@index([cpf])
@@ -370,6 +379,7 @@ model ServiceOrder {
   customer   Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   technician User?                @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   items      ServiceOrderItem[]
+  nfse       Nfse[]
 
   @@index([companyId])
   @@index([customerId])
@@ -493,4 +503,103 @@ model CashFlow {
 enum CashFlowType {
   INCOME  // Entrada
   EXPENSE // Saída
+}
+
+// ============================================
+// NFS-e (Nota Fiscal de Serviço Eletrônica)
+// ============================================
+
+model Nfse {
+  id          String   @id @default(uuid())
+  numero      String?  // Número da NFS-e após emissão
+  codigoVerificacao String? // Código de verificação da nota
+  status      NfseStatus @default(RASCUNHO)
+  dataEmissao DateTime?
+  competencia DateTime @default(now()) // Mês/ano da prestação do serviço
+
+  // RPS (Recibo Provisório de Serviço)
+  numeroRps   String
+  serieRps    String @default("RPS")
+  tipoRps     Int @default(1) // 1-RPS, 2-Nota Fiscal Conjugada (Mista), 3-Cupom
+
+  // Prestador (sempre a empresa)
+  companyId   String
+
+  // Tomador (cliente)
+  customerId  String?
+  tomadorCpfCnpj String?
+  tomadorNome String
+  tomadorEmail String?
+  tomadorTelefone String?
+  tomadorEndereco String?
+  tomadorNumero String?
+  tomadorComplemento String?
+  tomadorBairro String?
+  tomadorCidade String?
+  tomadorUf String?
+  tomadorCep String?
+  tomadorCodigoMunicipio String?
+
+  // Serviço
+  serviceOrderId String?
+  descricaoServico String
+  codigoServico String // Código do serviço na lista da prefeitura
+  codigoCnae String?
+  codigoTributacaoMunicipio String?
+
+  // Valores
+  valorServicos Decimal @db.Decimal(10, 2)
+  valorDeducoes Decimal @default(0) @db.Decimal(10, 2)
+  valorPis Decimal @default(0) @db.Decimal(10, 2)
+  valorCofins Decimal @default(0) @db.Decimal(10, 2)
+  valorInss Decimal @default(0) @db.Decimal(10, 2)
+  valorIr Decimal @default(0) @db.Decimal(10, 2)
+  valorCsll Decimal @default(0) @db.Decimal(10, 2)
+  outrasRetencoes Decimal @default(0) @db.Decimal(10, 2)
+  valorIss Decimal @default(0) @db.Decimal(10, 2)
+  aliquotaIss Decimal @default(0) @db.Decimal(5, 2)
+  descontoIncondicionado Decimal @default(0) @db.Decimal(10, 2)
+  descontoCondicionado Decimal @default(0) @db.Decimal(10, 2)
+  baseCalculo Decimal @db.Decimal(10, 2)
+  valorLiquidoNfse Decimal @db.Decimal(10, 2)
+
+  // ISS
+  issRetido Boolean @default(false)
+  responsavelRetencao Int? // 1-Tomador, 2-Intermediário
+  itemListaServico String // Ex: 07.02
+  discriminacao String // Discriminação do serviço
+  municipioIncidencia String? // Código do município de incidência do ISS
+
+  // Informações adicionais
+  observacoes String?
+
+  // Protocolo e XML
+  protocolo String? // Protocolo de envio
+  xmlEnvio String? @db.Text // XML enviado
+  xmlRetorno String? @db.Text // XML de retorno
+  mensagemErro String?
+
+  // Relacionamentos
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([serviceOrderId])
+  @@index([numero])
+  @@index([numeroRps])
+  @@index([status])
+  @@map("nfse")
+}
+
+enum NfseStatus {
+  RASCUNHO      // Ainda não enviada
+  ENVIADA       // Enviada para processamento
+  AUTORIZADA    // Autorizada pela prefeitura
+  CANCELADA     // Cancelada
+  ERRO          // Erro no processamento
 }

@@ -12,6 +12,7 @@ import ServiceOrders from './pages/ServiceOrders';
 import Categories from './pages/Categories';
 import AccountsReceivable from './pages/AccountsReceivable';
 import AccountsPayable from './pages/AccountsPayable';
+import Nfse from './pages/Nfse';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, loading } = useAuth();
@@ -53,6 +54,7 @@ function App() {
         <Route path="services" element={<ServiceOrders />} />
         <Route path="accounts-receivable" element={<AccountsReceivable />} />
         <Route path="accounts-payable" element={<AccountsPayable />} />
+        <Route path="nfse" element={<Nfse />} />
       </Route>
     </Routes>
   );

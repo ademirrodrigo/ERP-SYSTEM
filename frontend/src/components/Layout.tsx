@@ -9,6 +9,7 @@ import {
   Wrench,
   DollarSign,
   CreditCard,
+  FileText,
   LogOut,
   Menu,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const Layout = () => {
     { name: 'Serviços', href: '/services', icon: Wrench },
     { name: 'Contas a Receber', href: '/accounts-receivable', icon: DollarSign },
     { name: 'Contas a Pagar', href: '/accounts-payable', icon: CreditCard },
+    { name: 'NFS-e', href: '/nfse', icon: FileText },
   ];
 
   const isActive = (path: string) => {

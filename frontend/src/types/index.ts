@@ -134,6 +134,76 @@ export interface AccountPayable {
   };
 }
 
+export interface Nfse {
+  id: string;
+  numero?: string;
+  codigoVerificacao?: string;
+  status: 'RASCUNHO' | 'ENVIADA' | 'AUTORIZADA' | 'CANCELADA' | 'ERRO';
+  dataEmissao?: string;
+  competencia: string;
+
+  // RPS
+  numeroRps: string;
+  serieRps: string;
+  tipoRps: number;
+
+  // Tomador (Cliente)
+  tomadorCpfCnpj?: string;
+  tomadorNome: string;
+  tomadorEmail?: string;
+  tomadorTelefone?: string;
+  tomadorEndereco?: string;
+  tomadorNumero?: string;
+  tomadorComplemento?: string;
+  tomadorBairro?: string;
+  tomadorCidade?: string;
+  tomadorUf?: string;
+  tomadorCep?: string;
+  tomadorCodigoMunicipio?: string;
+
+  // Serviço
+  discriminacao: string;
+  itemListaServico: string;
+  codigoCnae?: string;
+  codigoTributacaoMunicipio?: string;
+  municipioIncidencia?: string;
+
+  // Valores
+  valorServicos: number;
+  valorDeducoes: number;
+  valorPis: number;
+  valorCofins: number;
+  valorInss: number;
+  valorIr: number;
+  valorCsll: number;
+  outrasRetencoes: number;
+  valorIss: number;
+  aliquotaIss: number;
+  descontoIncondicionado: number;
+  descontoCondicionado: number;
+  baseCalculo: number;
+  valorLiquidoNfse: number;
+
+  // ISS
+  issRetido: boolean;
+  responsavelRetencao?: number;
+
+  // Protocolo e XML
+  protocolo?: string;
+  xmlEnvio?: string;
+  xmlRetorno?: string;
+  mensagemErro?: string;
+
+  // Relacionamentos
+  customerId?: string;
+  customer?: Customer;
+  serviceOrderId?: string;
+  serviceOrder?: ServiceOrder;
+
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface DashboardStats {
   monthSales: {
     total: number;
