@@ -9,6 +9,7 @@ const Customers = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,22 +39,22 @@ const Customers = () => {
     onSuccess: () => {
       toast.success('Cliente criado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      setIsModalOpen(false);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        cpf: '',
-        cnpj: '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        isActive: true,
-      });
+      closeModal();
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Erro ao criar cliente');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/customers/${id}`, data),
+    onSuccess: () => {
+      toast.success('Cliente atualizado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      closeModal();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao atualizar cliente');
     },
   });
 
@@ -68,13 +69,52 @@ const Customers = () => {
     },
   });
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingCustomer(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      cpf: '',
+      cnpj: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      isActive: true,
+    });
+  };
+
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setFormData({
+      name: customer.name,
+      email: customer.email || '',
+      phone: customer.phone || '',
+      cpf: customer.cpf || '',
+      cnpj: customer.cnpj || '',
+      address: customer.address || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      zipCode: customer.zipCode || '',
+      isActive: customer.isActive,
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       toast.error('Nome é obrigatório');
       return;
     }
-    createMutation.mutate(formData);
+
+    if (editingCustomer) {
+      updateMutation.mutate({ id: editingCustomer.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -158,7 +198,7 @@ const Customers = () => {
                       <td>
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => toast.info('Funcionalidade de edição em desenvolvimento')}
+                            onClick={() => handleEdit(customer)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                           >
                             <Edit className="w-4 h-4" />
@@ -205,14 +245,16 @@ const Customers = () => {
         )}
       </div>
 
-      {/* Create Customer Modal */}
+      {/* Create/Edit Customer Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Novo Cliente</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingCustomer ? 'Editar Cliente' : 'Novo Cliente'}
+              </h2>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -389,17 +431,21 @@ const Customers = () => {
               <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="btn-secondary"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="btn-primary"
                 >
-                  {createMutation.isPending ? 'Salvando...' : 'Salvar Cliente'}
+                  {createMutation.isPending || updateMutation.isPending
+                    ? 'Salvando...'
+                    : editingCustomer
+                    ? 'Atualizar Cliente'
+                    : 'Salvar Cliente'}
                 </button>
               </div>
             </form>

@@ -9,6 +9,7 @@ const Products = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -38,22 +39,22 @@ const Products = () => {
     onSuccess: () => {
       toast.success('Produto criado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      setIsModalOpen(false);
-      setFormData({
-        name: '',
-        description: '',
-        sku: '',
-        barcode: '',
-        price: '',
-        cost: '',
-        stock: '',
-        minStock: '',
-        unit: 'UN',
-        isActive: true,
-      });
+      closeModal();
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Erro ao criar produto');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/products/${id}`, data),
+    onSuccess: () => {
+      toast.success('Produto atualizado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      closeModal();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao atualizar produto');
     },
   });
 
@@ -68,16 +69,55 @@ const Products = () => {
     },
   });
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingProduct(null);
+    setFormData({
+      name: '',
+      description: '',
+      sku: '',
+      barcode: '',
+      price: '',
+      cost: '',
+      stock: '',
+      minStock: '',
+      unit: 'UN',
+      isActive: true,
+    });
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      description: product.description || '',
+      sku: product.sku || '',
+      barcode: product.barcode || '',
+      price: product.price.toString(),
+      cost: product.cost?.toString() || '',
+      stock: product.stock.toString(),
+      minStock: product.minStock.toString(),
+      unit: product.unit,
+      isActive: product.isActive,
+    });
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
       ...formData,
       price: parseFloat(formData.price),
-      cost: parseFloat(formData.cost),
+      cost: formData.cost ? parseFloat(formData.cost) : undefined,
       stock: parseInt(formData.stock),
       minStock: parseInt(formData.minStock),
     };
-    createMutation.mutate(data);
+
+    if (editingProduct) {
+      updateMutation.mutate({ id: editingProduct.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -171,7 +211,7 @@ const Products = () => {
                       <td>
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => toast.info('Funcionalidade de edição em desenvolvimento')}
+                            onClick={() => handleEdit(product)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                           >
                             <Edit className="w-4 h-4" />
@@ -222,12 +262,14 @@ const Products = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-black opacity-50" onClick={() => setIsModalOpen(false)}></div>
+            <div className="fixed inset-0 bg-black opacity-50" onClick={closeModal}></div>
             <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold">Novo Produto</h2>
+                <h2 className="text-xl font-bold">
+                  {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+                </h2>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="p-2 hover:bg-gray-100 rounded-lg"
                 >
                   <X className="w-5 h-5" />
@@ -380,17 +422,21 @@ const Products = () => {
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeModal}
                     className="btn-secondary"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    disabled={createMutation.isPending}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="btn-primary"
                   >
-                    {createMutation.isPending ? 'Salvando...' : 'Salvar Produto'}
+                    {createMutation.isPending || updateMutation.isPending
+                      ? 'Salvando...'
+                      : editingProduct
+                      ? 'Atualizar Produto'
+                      : 'Salvar Produto'}
                   </button>
                 </div>
               </form>
