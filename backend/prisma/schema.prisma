@@ -52,6 +52,11 @@ model Company {
   optanteSimplesNacional Boolean @default(false)
   incentivadorCultural Boolean @default(false)
 
+  // Certificado Digital A1 para NFS-e
+  certificadoPfx      String? // Caminho do arquivo .pfx
+  certificadoSenha    String? // Senha do certificado (criptografada)
+  certificadoValidade DateTime? // Data de validade do certificado
+
   @@index([cnpj])
   @@map("companies")
 }

@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { PrismaClient, NfseStatus } from '@prisma/client';
 import { Builder } from 'xml2js';
+import { IssNetService } from '../services/issNetService';
+import { CertificateService } from '../services/certificateService';
+import { DanfseService } from '../services/danfseService';
+import * as fs from 'fs';
 
 const prisma = new PrismaClient();
 
@@ -287,6 +291,7 @@ export const sendNfse = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user!.companyId;
+    const { useSimulation = false } = req.body; // Permite simular para testes
 
     const nfse = await prisma.nfse.findFirst({
       where: { id, companyId },
@@ -319,39 +324,107 @@ export const sendNfse = async (req: Request, res: Response) => {
     // Gerar XML ABRASF
     const xmlEnvio = generateAbrasfXML(nfse, company);
 
-    // Aqui você deve implementar a integração com a API da Prefeitura de Goiânia
-    // Por enquanto, vamos simular uma resposta de sucesso
+    // Se estiver usando simulação (para testes sem certificado)
+    if (useSimulation) {
+      const numeroNfse = `${new Date().getFullYear()}${nfse.numeroRps}`;
+      const codigoVerificacao = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // NOTA: Para produção, você precisa:
-    // 1. Certificado Digital A1
-    // 2. Assinar o XML com o certificado
-    // 3. Enviar para o webservice da prefeitura
-    // 4. Processar o retorno
+      const updated = await prisma.nfse.update({
+        where: { id },
+        data: {
+          status: 'AUTORIZADA',
+          numero: numeroNfse,
+          codigoVerificacao,
+          dataEmissao: new Date(),
+          xmlEnvio,
+          protocolo: Math.random().toString(36).substring(2, 15),
+        },
+        include: {
+          customer: true,
+          serviceOrder: true,
+        },
+      });
 
-    // Simulação (remover em produção):
-    const numeroNfse = `${new Date().getFullYear()}${nfse.numeroRps}`;
-    const codigoVerificacao = Math.random().toString(36).substring(2, 10).toUpperCase();
+      return res.json(updated);
+    }
 
-    const updated = await prisma.nfse.update({
-      where: { id },
-      data: {
-        status: 'AUTORIZADA',
-        numero: numeroNfse,
-        codigoVerificacao,
-        dataEmissao: new Date(),
-        xmlEnvio,
-        protocolo: Math.random().toString(36).substring(2, 15),
-      },
-      include: {
-        customer: true,
-        serviceOrder: true,
-      },
+    // Integração real com a prefeitura
+    // Validar certificado
+    if (!company.certificadoPfx || !company.certificadoSenha) {
+      return res.status(400).json({
+        error: 'Certificado digital não configurado. Configure o certificado A1 da empresa.',
+      });
+    }
+
+    // Descriptografar senha do certificado
+    const certificadoSenha = CertificateService.decryptPassword(company.certificadoSenha);
+
+    // Validar certificado
+    const certValidation = await CertificateService.validateCertificate(
+      company.certificadoPfx,
+      certificadoSenha
+    );
+
+    if (!certValidation.valid) {
+      return res.status(400).json({
+        error: `Certificado inválido: ${certValidation.message}`,
+      });
+    }
+
+    // Criar serviço de integração
+    const issNetService = new IssNetService({
+      environment: process.env.NFSE_ENVIRONMENT as 'production' | 'homologation' || 'homologation',
+      certificatePath: company.certificadoPfx,
+      certificatePassword: certificadoSenha,
     });
 
-    res.json(updated);
+    // Enviar RPS para a prefeitura
+    const result = await issNetService.sendRps(xmlEnvio);
+
+    if (result.success) {
+      const updated = await prisma.nfse.update({
+        where: { id },
+        data: {
+          status: 'AUTORIZADA',
+          numero: result.numero,
+          codigoVerificacao: result.codigoVerificacao,
+          dataEmissao: result.dataEmissao || new Date(),
+          protocolo: result.protocolo,
+          xmlEnvio,
+          xmlRetorno: result.xmlRetorno,
+        },
+        include: {
+          customer: true,
+          serviceOrder: true,
+        },
+      });
+
+      res.json(updated);
+    } else {
+      // Erro ao enviar
+      const updated = await prisma.nfse.update({
+        where: { id },
+        data: {
+          status: 'ERRO',
+          xmlEnvio,
+          xmlRetorno: result.xmlRetorno,
+          mensagemErro: result.errors?.join('; '),
+        },
+        include: {
+          customer: true,
+          serviceOrder: true,
+        },
+      });
+
+      res.status(400).json({
+        error: 'Erro ao enviar NFS-e para a prefeitura',
+        details: result.errors,
+        nfse: updated,
+      });
+    }
   } catch (error) {
     console.error('Error sending NFS-e:', error);
-    res.status(500).json({ error: 'Erro ao enviar NFS-e' });
+    res.status(500).json({ error: `Erro ao enviar NFS-e: ${(error as Error).message}` });
   }
 };
 
@@ -360,6 +433,7 @@ export const cancelNfse = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const companyId = req.user!.companyId;
+    const { useSimulation = false, motivo = 'Cancelamento solicitado pelo prestador' } = req.body;
 
     const nfse = await prisma.nfse.findFirst({
       where: { id, companyId },
@@ -373,24 +447,84 @@ export const cancelNfse = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Apenas NFS-e autorizadas podem ser canceladas' });
     }
 
-    // Aqui você deve implementar o cancelamento via API da prefeitura
-    // Por enquanto, vamos apenas atualizar o status
+    if (!nfse.numero) {
+      return res.status(400).json({ error: 'NFS-e sem número de nota' });
+    }
 
-    const updated = await prisma.nfse.update({
-      where: { id },
-      data: {
-        status: 'CANCELADA',
-      },
-      include: {
-        customer: true,
-        serviceOrder: true,
-      },
+    // Se estiver usando simulação
+    if (useSimulation) {
+      const updated = await prisma.nfse.update({
+        where: { id },
+        data: {
+          status: 'CANCELADA',
+        },
+        include: {
+          customer: true,
+          serviceOrder: true,
+        },
+      });
+
+      return res.json(updated);
+    }
+
+    // Buscar dados da empresa
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
     });
 
-    res.json(updated);
+    if (!company) {
+      return res.status(404).json({ error: 'Empresa não encontrada' });
+    }
+
+    // Validar certificado
+    if (!company.certificadoPfx || !company.certificadoSenha || !company.cnpj || !company.inscricaoMunicipal) {
+      return res.status(400).json({
+        error: 'Dados fiscais ou certificado não configurados.',
+      });
+    }
+
+    // Descriptografar senha do certificado
+    const certificadoSenha = CertificateService.decryptPassword(company.certificadoSenha);
+
+    // Criar serviço de integração
+    const issNetService = new IssNetService({
+      environment: process.env.NFSE_ENVIRONMENT as 'production' | 'homologation' || 'homologation',
+      certificatePath: company.certificadoPfx,
+      certificatePassword: certificadoSenha,
+    });
+
+    // Cancelar na prefeitura
+    const result = await issNetService.cancelNfse(
+      nfse.numero,
+      company.cnpj,
+      company.inscricaoMunicipal,
+      '1',
+      motivo
+    );
+
+    if (result.success) {
+      const updated = await prisma.nfse.update({
+        where: { id },
+        data: {
+          status: 'CANCELADA',
+          xmlRetorno: result.xmlRetorno,
+        },
+        include: {
+          customer: true,
+          serviceOrder: true,
+        },
+      });
+
+      res.json(updated);
+    } else {
+      res.status(400).json({
+        error: 'Erro ao cancelar NFS-e na prefeitura',
+        details: result.errors,
+      });
+    }
   } catch (error) {
     console.error('Error canceling NFS-e:', error);
-    res.status(500).json({ error: 'Erro ao cancelar NFS-e' });
+    res.status(500).json({ error: `Erro ao cancelar NFS-e: ${(error as Error).message}` });
   }
 };
 
@@ -443,15 +577,77 @@ export const generatePdfNfse = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Apenas NFS-e autorizadas podem gerar PDF' });
     }
 
-    // Aqui você deve implementar a geração do PDF (DANFSE)
-    // Pode usar bibliotecas como pdfkit, puppeteer, ou buscar o PDF na prefeitura
+    const company = nfse.company;
 
-    res.json({
-      message: 'Geração de PDF ainda não implementada',
-      nfse,
-    });
+    // Preparar dados para o PDF
+    const danfseData = {
+      // NFS-e
+      numero: nfse.numero,
+      codigoVerificacao: nfse.codigoVerificacao,
+      dataEmissao: nfse.dataEmissao || undefined,
+      competencia: nfse.competencia,
+
+      // Prestador
+      prestadorNome: company.name,
+      prestadorCnpj: company.cnpj,
+      prestadorInscricaoMunicipal: company.inscricaoMunicipal,
+      prestadorEndereco: company.address,
+      prestadorCidade: company.city,
+      prestadorUf: company.state,
+      prestadorCep: company.zipCode,
+      prestadorTelefone: company.phone,
+      prestadorEmail: company.email,
+
+      // Tomador
+      tomadorNome: nfse.tomadorNome,
+      tomadorCpfCnpj: nfse.tomadorCpfCnpj,
+      tomadorEmail: nfse.tomadorEmail,
+      tomadorTelefone: nfse.tomadorTelefone,
+      tomadorEndereco: nfse.tomadorEndereco,
+      tomadorNumero: nfse.tomadorNumero,
+      tomadorComplemento: nfse.tomadorComplemento,
+      tomadorBairro: nfse.tomadorBairro,
+      tomadorCidade: nfse.tomadorCidade,
+      tomadorUf: nfse.tomadorUf,
+      tomadorCep: nfse.tomadorCep,
+
+      // Serviço
+      discriminacao: nfse.discriminacao,
+      itemListaServico: nfse.itemListaServico,
+      codigoCnae: nfse.codigoCnae,
+
+      // Valores
+      valorServicos: Number(nfse.valorServicos),
+      valorDeducoes: Number(nfse.valorDeducoes),
+      valorPis: Number(nfse.valorPis),
+      valorCofins: Number(nfse.valorCofins),
+      valorInss: Number(nfse.valorInss),
+      valorIr: Number(nfse.valorIr),
+      valorCsll: Number(nfse.valorCsll),
+      outrasRetencoes: Number(nfse.outrasRetencoes),
+      valorIss: Number(nfse.valorIss),
+      aliquotaIss: Number(nfse.aliquotaIss),
+      descontoIncondicionado: Number(nfse.descontoIncondicionado),
+      baseCalculo: Number(nfse.baseCalculo),
+      valorLiquidoNfse: Number(nfse.valorLiquidoNfse),
+      issRetido: nfse.issRetido,
+    };
+
+    // Gerar PDF
+    const pdfBuffer = await DanfseService.generatePdf(danfseData);
+
+    // Definir headers para download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="DANFSE_${nfse.numero || nfse.numeroRps}.pdf"`
+    );
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    // Enviar PDF
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Error generating PDF:', error);
-    res.status(500).json({ error: 'Erro ao gerar PDF' });
+    res.status(500).json({ error: `Erro ao gerar PDF: ${(error as Error).message}` });
   }
 };
